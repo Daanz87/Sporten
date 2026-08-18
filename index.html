@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trainingslog — Daan &amp; Esther</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+<style>
+  body { background-color: #0a0a0a; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback } = React;
+
+/* ---------- kleine inline iconen (geen externe iconenbibliotheek nodig) ---------- */
+const Icon = ({ children, className }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+       strokeLinecap="round" strokeLinejoin="round" className={className}>
+    {children}
+  </svg>
+);
+const ChevronDown = (p) => <Icon {...p}><polyline points="6 9 12 15 18 9"/></Icon>;
+const ChevronUp = (p) => <Icon {...p}><polyline points="18 15 12 9 6 15"/></Icon>;
+const Plus = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
+const X = (p) => <Icon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
+const Check = (p) => <Icon {...p}><polyline points="20 6 9 17 4 12"/></Icon>;
+const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></Icon>;
+const History = (p) => <Icon {...p}><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><polyline points="12 7 12 12 16 14"/></Icon>;
+const Award = (p) => <Icon {...p}><circle cx="12" cy="8" r="6"/><path d="M15.5 13.5 17 22l-5-3-5 3 1.5-8.5"/></Icon>;
+const Info = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
+const Dumbbell = (p) => <Icon {...p}><path d="M6.5 6.5 17.5 17.5"/><path d="M21 21l-1-1"/><path d="M3 3l1 1"/><path d="M18 22l-3-3"/><path d="M6 5l3 3"/><path d="M22 18l-3 3"/><path d="M5 6l-3-3"/><path d="M15 19l3-3"/></Icon>;
+
+/* ---------- data van de sportleraar (ongewijzigd) ---------- */
+const MUSCLE_GROUPS = [
+  { id: "chest", name: "Borst", exercises: [
+    { id: "chest-press", name: "Chest press machine", sets: 3, reps: "10" },
+    { id: "chest-fly", name: "Chest fly (kabel of machine)", sets: 3, reps: "10" },
+    { id: "chest-pushout", name: "Chest pushouts KB", sets: 3, reps: "20" },
+  ]},
+  { id: "shoulder", name: "Schouders", exercises: [
+    { id: "shoulder-press-machine", name: "Shoulder press machine", sets: 3, reps: "10" },
+    { id: "db-side-raise", name: "DB side raise", sets: 3, reps: "10" },
+    { id: "shoulder-press-kb", name: "Shoulder press KB", sets: 3, reps: "15" },
+  ]},
+  { id: "back", name: "Rug", exercises: [
+    { id: "lat-pulldown-wide", name: "Lat pulldown breed", sets: 3, reps: "10" },
+    { id: "lat-pulldown-small", name: "Lat pulldown smal", sets: 3, reps: "10" },
+    { id: "cable-row", name: "Cable row", sets: 3, reps: "10" },
+  ]},
+  { id: "core", name: "Core", exercises: [
+    { id: "back-extension", name: "Back extension L/R", sets: 3, reps: "10 per kant" },
+    { id: "crunch-bal", name: "Crunch met bal", sets: 3, reps: "20" },
+    { id: "knee-raises", name: "Knee raises", sets: 3, reps: "10" },
+  ]},
+  { id: "biceps", name: "Biceps", exercises: [
+    { id: "hammer-curl", name: "Hammer curls", sets: 3, reps: "10" },
+    { id: "bayesian-curl", name: "Bayesian curl", sets: 3, reps: "10" },
+    { id: "preacher-curl", name: "Preacher curl", sets: 3, reps: "10" },
+  ]},
+  { id: "triceps", name: "Triceps", exercises: [
+    { id: "cable-pushdown", name: "Cable push down", sets: 3, reps: "10" },
+    { id: "single-arm-overhead", name: "Single arm cable overhead", sets: 3, reps: "10 per kant" },
+    { id: "french-press", name: "French press", sets: 3, reps: "10" },
+  ]},
+  { id: "quads", name: "Benen — quadriceps", exercises: [
+    { id: "squat-kb", name: "Squat met KB aan 1 kant (tempo 3-1-3)", sets: 3, reps: "10 per kant" },
+    { id: "leg-extension", name: "Leg extension", sets: 3, reps: "10" },
+  ]},
+  { id: "hamstrings", name: "Benen — hamstrings", exercises: [
+    { id: "rdl", name: "RDL", sets: 3, reps: "10" },
+    { id: "standing-leg-curl", name: "Standing leg curl", sets: 3, reps: "10 per kant" },
+  ]},
+  { id: "glutes", name: "Bilspieren / heupadductoren", exercises: [
+    { id: "abductor", name: "Abductor", sets: 4, reps: "20, 18, 16, 16" },
+    { id: "adductor", name: "Adductor", sets: 4, reps: "20, 18, 16, 14" },
+  ]},
+];
+
+const TOTAL_EXERCISES = MUSCLE_GROUPS.reduce((n, g) => n + g.exercises.length, 0);
+const STORAGE_KEY = "trainingslog-daan-esther";
+
+function isoWeekKey(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+  return `${date.getUTCFullYear()}-W${week}`;
+}
+function fmtDate(iso) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+}
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function loadLogs() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+function saveLogs(logs) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function TrainingsLog() {
+  const [tab, setTab] = useState("trainen");
+  const [user, setUser] = useState("Daan");
+  const [logs, setLogs] = useState({});
+  const [saveError, setSaveError] = useState("");
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set([MUSCLE_GROUPS[0].id]));
+  const [openLogFor, setOpenLogFor] = useState(null);
+  const [historyOpenFor, setHistoryOpenFor] = useState(new Set());
+  const [formState, setFormState] = useState({ weight: "", reps: "", note: "", date: todayISO() });
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => { setLogs(loadLogs()); }, []);
+
+  const persist = useCallback((nextLogs) => {
+    const ok = saveLogs(nextLogs);
+    setSaveError(ok ? "" : "Opslaan is niet gelukt. Je browser heeft dit mogelijk geblokkeerd.");
+  }, []);
+
+  function toggleGroup(id) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+  function toggleHistory(id) {
+    setHistoryOpenFor((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+  function openForm(exId) {
+    setOpenLogFor(exId);
+    setFormError("");
+    setFormState({ weight: "", reps: "", note: "", date: todayISO() });
+  }
+  function closeForm() { setOpenLogFor(null); setFormError(""); }
+
+  function saveEntry(ex) {
+    const weightNum = parseFloat(formState.weight.replace(",", "."));
+    if (!formState.weight || isNaN(weightNum) || weightNum <= 0) {
+      setFormError("Vul een geldig gewicht in (kg).");
+      return;
+    }
+    if (!formState.date) { setFormError("Kies een datum."); return; }
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      date: formState.date, user, weight: weightNum,
+      reps: formState.reps.trim(), note: formState.note.trim(),
+    };
+    const existing = logs[ex.id] || [];
+    const nextForEx = [...existing, entry].sort((a, b) => (a.date < b.date ? 1 : -1));
+    const nextLogs = { ...logs, [ex.id]: nextForEx };
+    setLogs(nextLogs);
+    persist(nextLogs);
+    closeForm();
+  }
+
+  function deleteEntry(exId, entryId) {
+    const nextForEx = (logs[exId] || []).filter((e) => e.id !== entryId);
+    const nextLogs = { ...logs, [exId]: nextForEx };
+    setLogs(nextLogs);
+    persist(nextLogs);
+  }
+
+  function lastEntry(exId) {
+    const arr = logs[exId] || [];
+    return arr.length ? arr[0] : null;
+  }
+  function maxWeightBefore(exId, excludingLatest) {
+    const arr = logs[exId] || [];
+    const rest = excludingLatest ? arr.slice(1) : arr;
+    if (!rest.length) return null;
+    return Math.max(...rest.map((e) => e.weight));
+  }
+
+  const thisWeek = isoWeekKey(new Date());
+  const loggedThisWeek = MUSCLE_GROUPS.reduce((n, g) => n + g.exercises.filter((ex) => {
+    const arr = logs[ex.id] || [];
+    return arr.some((e) => isoWeekKey(new Date(e.date + "T00:00:00")) === thisWeek);
+  }).length, 0);
+
+  return (
+    <div className="min-h-screen bg-neutral-950 text-neutral-100">
+      <div className="max-w-2xl mx-auto px-4 pb-16">
+        <header className="pt-8 pb-5 border-b border-neutral-800">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-amber-400 flex items-center justify-center flex-shrink-0">
+              <Dumbbell className="w-6 h-6 text-neutral-900" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold uppercase tracking-wide text-neutral-50">Trainingslog</h1>
+              <p className="text-xs text-neutral-500 uppercase tracking-widest">Daan &amp; Esther</p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between gap-4">
+            <div className="flex bg-neutral-900 border border-neutral-800 rounded-full p-1">
+              {["Daan", "Esther"].map((name) => (
+                <button key={name} onClick={() => setUser(name)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${user === name ? "bg-amber-400 text-neutral-900" : "text-neutral-400 hover:text-neutral-200"}`}>
+                  {name}
+                </button>
+              ))}
+            </div>
+            <div className="text-right">
+              <p className="text-[11px] text-neutral-500 uppercase tracking-wider">Deze week</p>
+              <p className="font-mono text-sm text-neutral-200">{loggedThisWeek}/{TOTAL_EXERCISES}</p>
+            </div>
+          </div>
+          <div className="mt-2 h-1.5 w-full bg-neutral-900 rounded-full overflow-hidden">
+            <div className="h-full bg-amber-400 transition-all" style={{ width: `${TOTAL_EXERCISES ? (loggedThisWeek / TOTAL_EXERCISES) * 100 : 0}%` }} />
+          </div>
+
+          <div className="mt-5 flex gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1">
+            <button onClick={() => setTab("trainen")}
+              className={`flex-1 py-2 rounded-md text-sm font-semibold uppercase tracking-wide transition-colors ${tab === "trainen" ? "bg-neutral-800 text-amber-400" : "text-neutral-500 hover:text-neutral-300"}`}>
+              Trainen
+            </button>
+            <button onClick={() => setTab("richtlijnen")}
+              className={`flex-1 py-2 rounded-md text-sm font-semibold uppercase tracking-wide transition-colors ${tab === "richtlijnen" ? "bg-neutral-800 text-amber-400" : "text-neutral-500 hover:text-neutral-300"}`}>
+              Richtlijnen
+            </button>
+          </div>
+        </header>
+
+        {saveError && (
+          <div className="mt-4 px-3 py-2 bg-red-950 border border-red-900 rounded-lg text-sm text-red-300">{saveError}</div>
+        )}
+
+        {tab === "trainen" && (
+          <div className="mt-5 space-y-3">
+            {MUSCLE_GROUPS.map((group) => {
+              const groupLoggedThisWeek = group.exercises.filter((ex) => {
+                const arr = logs[ex.id] || [];
+                return arr.some((e) => isoWeekKey(new Date(e.date + "T00:00:00")) === thisWeek);
+              }).length;
+              const isOpen = expandedGroups.has(group.id);
+              return (
+                <div key={group.id} className="border border-neutral-800 rounded-xl bg-neutral-900/60 overflow-hidden">
+                  <button onClick={() => toggleGroup(group.id)} className="w-full flex items-center justify-between px-4 py-3.5">
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-bold uppercase tracking-wide text-sm text-neutral-100">{group.name}</h2>
+                      <div className="flex items-center gap-1">
+                        {group.exercises.map((_, i) => (
+                          <span key={i} className={`w-2 h-2 rounded-full ${i < groupLoggedThisWeek ? "bg-amber-400" : "bg-neutral-700"}`} />
+                        ))}
+                      </div>
+                    </div>
+                    {isOpen ? <ChevronUp className="w-4 h-4 text-neutral-500" /> : <ChevronDown className="w-4 h-4 text-neutral-500" />}
+                  </button>
+
+                  {isOpen && (
+                    <div className="border-t border-neutral-800 divide-y divide-neutral-800">
+                      {group.exercises.map((ex) => {
+                        const last = lastEntry(ex.id);
+                        const prevMax = last ? maxWeightBefore(ex.id, true) : null;
+                        const isPR = last && prevMax !== null && last.weight > prevMax;
+                        const history = (logs[ex.id] || []).slice(0, 6);
+                        const isFormOpen = openLogFor === ex.id;
+                        const isHistOpen = historyOpenFor.has(ex.id);
+
+                        return (
+                          <div key={ex.id} className="px-4 py-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm text-neutral-100 leading-snug">{ex.name}</p>
+                                <p className="text-xs font-mono text-neutral-500 mt-0.5">{ex.sets} sets × {ex.reps} reps</p>
+                                {last ? (
+                                  <div className="flex items-center gap-1.5 mt-1.5">
+                                    <span className="font-mono text-sm text-amber-400">{last.weight} kg</span>
+                                    <span className="text-xs text-neutral-500">· {fmtDate(last.date)}</span>
+                                    {isPR && <span className="flex items-center gap-0.5 text-xs text-red-400 font-semibold"><Award className="w-3 h-3" /> PR</span>}
+                                  </div>
+                                ) : <p className="text-xs text-neutral-600 mt-1.5">Nog niet gelogd</p>}
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                {(logs[ex.id] || []).length > 0 && (
+                                  <button onClick={() => toggleHistory(ex.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800" aria-label="Geschiedenis">
+                                    <History className="w-4 h-4" />
+                                  </button>
+                                )}
+                                <button onClick={() => (isFormOpen ? closeForm() : openForm(ex.id))}
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center ${isFormOpen ? "bg-neutral-800 text-neutral-300" : "bg-amber-400 text-neutral-900"}`} aria-label="Gewicht loggen">
+                                  {isFormOpen ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                </button>
+                              </div>
+                            </div>
+
+                            {isFormOpen && (
+                              <div className="mt-3 bg-neutral-800/60 rounded-lg p-3 space-y-2">
+                                <div className="flex gap-2">
+                                  <div className="flex-1">
+                                    <label className="text-[11px] text-neutral-500 uppercase tracking-wide">Gewicht (kg)</label>
+                                    <input type="text" inputMode="decimal" value={formState.weight}
+                                      onChange={(e) => setFormState((s) => ({ ...s, weight: e.target.value }))}
+                                      placeholder="bv. 32.5"
+                                      className="mt-1 w-full bg-neutral-900 border border-neutral-700 rounded-md px-2.5 py-1.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-amber-400" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <label className="text-[11px] text-neutral-500 uppercase tracking-wide">Datum</label>
+                                    <input type="date" value={formState.date}
+                                      onChange={(e) => setFormState((s) => ({ ...s, date: e.target.value }))}
+                                      className="mt-1 w-full bg-neutral-900 border border-neutral-700 rounded-md px-2.5 py-1.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-amber-400" />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="text-[11px] text-neutral-500 uppercase tracking-wide">Behaalde reps (optioneel)</label>
+                                  <input type="text" value={formState.reps}
+                                    onChange={(e) => setFormState((s) => ({ ...s, reps: e.target.value }))}
+                                    placeholder={`bv. ${ex.reps}`}
+                                    className="mt-1 w-full bg-neutral-900 border border-neutral-700 rounded-md px-2.5 py-1.5 text-sm text-neutral-100 focus:outline-none focus:border-amber-400" />
+                                </div>
+                                <div>
+                                  <label className="text-[11px] text-neutral-500 uppercase tracking-wide">Notitie (optioneel)</label>
+                                  <input type="text" value={formState.note}
+                                    onChange={(e) => setFormState((s) => ({ ...s, note: e.target.value }))}
+                                    placeholder="bv. voelde zwaar"
+                                    className="mt-1 w-full bg-neutral-900 border border-neutral-700 rounded-md px-2.5 py-1.5 text-sm text-neutral-100 focus:outline-none focus:border-amber-400" />
+                                </div>
+                                {formError && <p className="text-xs text-red-400">{formError}</p>}
+                                <div className="flex gap-2 pt-1">
+                                  <button onClick={() => saveEntry(ex)} className="flex-1 flex items-center justify-center gap-1.5 bg-amber-400 text-neutral-900 rounded-md py-2 text-sm font-semibold">
+                                    <Check className="w-4 h-4" /> Opslaan als {user}
+                                  </button>
+                                  <button onClick={closeForm} className="px-4 rounded-md border border-neutral-700 text-neutral-300 text-sm">Annuleer</button>
+                                </div>
+                              </div>
+                            )}
+
+                            {isHistOpen && history.length > 0 && (
+                              <div className="mt-3 space-y-1.5">
+                                {history.map((entry) => (
+                                  <div key={entry.id} className="flex items-center justify-between text-xs bg-neutral-900/70 rounded-md px-2.5 py-1.5">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="font-mono text-amber-400 flex-shrink-0">{entry.weight} kg</span>
+                                      <span className="text-neutral-500 flex-shrink-0">{fmtDate(entry.date)}</span>
+                                      <span className="text-neutral-600 flex-shrink-0">· {entry.user}</span>
+                                      {entry.reps && <span className="text-neutral-500 truncate">reps: {entry.reps}</span>}
+                                    </div>
+                                    <button onClick={() => deleteEntry(ex.id, entry.id)} className="ml-2 text-neutral-600 hover:text-red-400 flex-shrink-0" aria-label="Verwijder">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === "richtlijnen" && <Richtlijnen />}
+
+        <p className="text-center text-[11px] text-neutral-700 mt-8">
+          Gegevens worden lokaal in deze browser bewaard (localStorage). Op een ander apparaat of in een andere browser start je met een lege log.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <div className="border border-neutral-800 rounded-xl bg-neutral-900/60 p-4">
+      <h3 className="font-bold uppercase tracking-wide text-sm text-amber-400 mb-2.5">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function Richtlijnen() {
+  return (
+    <div className="mt-5 space-y-3">
+      <div className="flex items-start gap-2 px-1 pb-1 text-xs text-neutral-500">
+        <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+        <p>Deze richtlijnen zijn opgesteld door de sportleraar en worden hier ongewijzigd weergegeven.</p>
+      </div>
+
+      <Section title="Kracht en spiergroei">
+        <ul className="space-y-1.5 text-sm text-neutral-300 list-disc list-inside">
+          <li>Train elke spiergroep twee keer per week.</li>
+          <li>Voer per spiergroep minimaal 2 oefeningen uit tijdens elke training.</li>
+          <li>Wissel samengestelde oefeningen (compound) af met isolatieoefeningen.</li>
+          <li>Voer elke oefening uit met een zo groot mogelijke bewegingsuitslag (range of motion).</li>
+          <li>Voer per oefening 6–12 herhalingen uit: 6–8 voor compound, 10–12 voor isolatie.</li>
+          <li>Train elke set dicht bij je maximale kunnen — bij de laatste rep zou je nog maximaal 2 reps extra moeten kunnen doen.</li>
+          <li>Rust 1,5–2 minuten tussen de sets.</li>
+          <li>Pas elke week, of minimaal om de week, progressive overload toe: het gewicht geleidelijk verhogen.</li>
+        </ul>
+      </Section>
+
+      <Section title="Cardio">
+        <ul className="space-y-1.5 text-sm text-neutral-300 list-disc list-inside">
+          <li>Conditie: intervaltraining met een hoge hartslag — echt buiten adem raken.</li>
+          <li>Vetverlies: cardio op lagere intensiteit — nog een normaal gesprek kunnen voeren.</li>
+        </ul>
+      </Section>
+
+      <Section title="Voeding en hydratatie">
+        <ul className="space-y-1.5 text-sm text-neutral-300 list-disc list-inside">
+          <li>Minimaal 1,8 gram eiwit per kilogram lichaamsgewicht per dag.</li>
+          <li>Licht calorietekort aanhouden om vet te verliezen en lichaamssamenstelling te verbeteren.</li>
+          <li>Niet te veel koolhydraten — vooral vóór training voor energie, na training voor herstel.</li>
+          <li>Maaltijden verdelen over de dag (4–6 uur ertussen) om hongergevoel te verminderen.</li>
+          <li>Eiwitrijke snack kiezen in plaats van brood, koekjes of snoep — bv. magere Griekse yoghurt met bessen en honing.</li>
+          <li>2–2,5 liter water per dag drinken.</li>
+        </ul>
+      </Section>
+
+      <Section title="Slaap">
+        <ul className="space-y-1.5 text-sm text-neutral-300 list-disc list-inside">
+          <li>Streef naar 7–9 uur slaap per nacht.</li>
+          <li>Niet meer eten binnen 2 uur voor het slapengaan.</li>
+          <li>Telefoon, tablet of computer vermijden vlak voor het slapengaan.</li>
+          <li>Slaap in een donkere kamer met zo min mogelijk licht.</li>
+        </ul>
+      </Section>
+
+      <Section title="Eiwitrijke voeding ter inspiratie">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm text-neutral-300">
+          <div>
+            <p className="text-xs text-neutral-500 uppercase tracking-wide mb-1">Dierlijk</p>
+            <p>Kipfilet, kalkoen, mager rundvlees, varkenshaas, vis (zalm, tonijn, kabeljauw, makreel), garnalen, eieren</p>
+          </div>
+          <div>
+            <p className="text-xs text-neutral-500 uppercase tracking-wide mb-1">Zuivel</p>
+            <p>Kwark/Skyr, Griekse yoghurt, hüttenkäse, melk, kaas</p>
+          </div>
+          <div>
+            <p className="text-xs text-neutral-500 uppercase tracking-wide mb-1">Plantaardig</p>
+            <p>Linzen, kikkererwten, bonen, tofu, tempeh, edamame</p>
+          </div>
+          <div>
+            <p className="text-xs text-neutral-500 uppercase tracking-wide mb-1">Noten, zaden &amp; granen</p>
+            <p>Amandelen, pinda's/pindakaas, pompoenpitten, chiazaden, quinoa, havermout</p>
+          </div>
+        </div>
+        <p className="mt-3 text-sm text-neutral-300">
+          <span className="text-xs text-neutral-500 uppercase tracking-wide">Overig — </span>
+          eiwitpoeder (whey of plantaardig)
+        </p>
+      </Section>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<TrainingsLog />);
+</script>
+</body>
+</html>
